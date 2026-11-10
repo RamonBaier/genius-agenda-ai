@@ -1,0 +1,133 @@
+services:
+  # ---------------- Evolution API (WhatsApp) ----------------
+  evolution-api:
+    container_name: evolution_api
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      # 'environment' tem prioridade sobre env_file
+      DATABASE_CONNECTION_URI: postgresql://evolution:${EVOLUTION_DB_PASSWORD:?defina EVOLUTION_DB_PASSWORD no .env}@postgres:5432/evolution?schema=public
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks:
+      - evolution-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    container_name: evolution_postgres
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: evolution
+      POSTGRES_PASSWORD: ${EVOLUTION_DB_PASSWORD:?defina EVOLUTION_DB_PASSWORD no .env}
+      POSTGRES_DB: evolution
+    ports:
+      - "5432:5432"
+    volumes:
+      - evolution_postgres:/var/lib/postgresql/data
+    networks:
+      - evolution-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evolution -d evolution"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    container_name: evolution_redis
+    image: redis:latest
+    restart: always
+    command: redis-server --port 6379 --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - evolution_redis:/data
+    networks:
+      - evolution-net
+
+  # ---------------- n8n ( webhook + agente de IA) ----------------
+  n8n-postgres:
+    container_name: n8n_postgres
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD: ${N8N_DB_PASSWORD:?defina N8N_DB_PASSWORD no .env}
+      POSTGRES_DB: n8n
+    volumes:
+      - n8n_postgres:/var/lib/postgresql/data
+    networks:
+      - evolution-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    container_name: n8n
+    image: n8nio/n8n:2.46.7
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: n8n-postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD:?defina N8N_DB_PASSWORD no .env}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:?defina N8N_ENCRYPTION_KEY no .env}
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: America/Recife
+      TZ: America/Recife
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - evolution-net
+    depends_on:
+      n8n-postgres:
+        condition: service_healthy
+
+  agenda-service:
+    container_name: agenda_service
+    build: ./service
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-}
+      GOOGLE_CREDENTIALS_FILE: /secrets/credentials.json
+      TZ: America/Recife
+    volumes:
+      - ./secrets:/secrets:ro
+    networks:
+      - evolution-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  evolution_instances:
+  evolution_postgres:
+  evolution_redis:
+  n8n_postgres:
+  n8n_data:
+
+networks:
+  evolution-net:
+    name: evolution-net
+    driver: bridge

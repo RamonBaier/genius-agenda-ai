@@ -1,0 +1,456 @@
+{
+  "name": "Agenda AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agenteIA",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        96
+      ],
+      "id": "de13735d-929e-425f-b59f-212b8b20c8e5",
+      "name": "Webhook",
+      "webhookId": "ac463987-24eb-4f25-9c47-ee3f8fe9eef3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6c807502-99f5-4ee4-abbb-d47f7e9d04c4",
+              "name": "texto",
+              "value": "={{ $json.body.data.message.conversation || $json.body.data.message.extendedTextMessage?.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "b4861e8a-aa2c-46df-b7f7-7c859b0288b9",
+              "name": "jid",
+              "value": "={{ $json.body.data.key.remoteJid }}",
+              "type": "string"
+            },
+            {
+              "id": "e9d7c2aa-230a-41db-92df-71ef3bfb6674",
+              "name": "destino",
+              "value": "={{ $json.body.data.key.remoteJidAlt || $json.body.data.key.remoteJid }}",
+              "type": "string"
+            },
+            {
+              "id": "498c4091-ca31-4b7d-bf84-802c928a2ae1",
+              "name": "fromMe",
+              "value": "={{ $json.body.data.key.fromMe }}",
+              "type": "boolean"
+            },
+            {
+              "id": "c223647d-de03-45c6-a9ec-c8f234ca4bce",
+              "name": "messageId",
+              "value": "={{ $json.body.data.key.id }}",
+              "type": "string"
+            },
+            {
+              "id": "f97465de-1cdd-421e-81f5-4d6bf39029de",
+              "name": "timestamp",
+              "value": "={{ $json.body.data.messageTimestamp }}",
+              "type": "number"
+            },
+            {
+              "id": "2936d034-df21-4d7a-acbb-9c99956de354",
+              "name": "number",
+              "value": "={{ ($json.body.data.key.remoteJidAlt || $json.body.data.key.remoteJid).split('@')[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        96
+      ],
+      "id": "cfefcdfe-c04e-42df-8532-f580a783b6ee",
+      "name": "Extrair mensagem"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "aaedfe39-f9e0-4e2e-9e02-d2d0b4bd9e7c",
+              "leftValue": "={{ $json.texto }}",
+              "rightValue": "🤖",
+              "operator": {
+                "type": "string",
+                "operation": "notStartsWith"
+              }
+            },
+            {
+              "id": "dc3e1720-f2ea-427e-b7d5-67afce0cf6ac",
+              "leftValue": "={{ $json.fromMe }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "a8c4ec1f-44a5-4826-80c5-bb017f5a91df",
+              "leftValue": "={{ $json.texto }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "2a79d095-5d12-426d-9573-aa959567434f",
+              "leftValue": "={{ $json.number }}",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
+              "rightValue": "SEU_NUMERO"
+            },
+            {
+              "id": "936600ab-858b-46b9-aac0-0bfa8756052d",
+              "leftValue": "={{ $json.timestamp }}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "rightValue": "={{ Math.floor(Date.now()/1000) - 300 }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        96
+      ],
+      "id": "d49905bf-28bb-4f5c-8b06-f28c6b8e1d87",
+      "name": "Filtro"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.texto }}\nData e hora atuais do sistema: {{ $now.format('yyyy-MM-dd HH:mm:ss') }}\n(Dia da semana: {{ $now.format('cccc') }})\nFuso Horário: America/Recife (UTC-3)",
+        "options": {
+          "systemMessage": "Você é um secretário pessoal eficiente, cortês e organizado. Gerencia o Google Calendar do usuário por mensagens de WhatsApp.\n\n1. DATA E HORA\n- Use ESTRITAMENTE a \"Data e hora atuais do sistema\" informada na mensagem para calcular datas relativas (\"hoje\", \"amanhã\", \"próxima terça\", etc.). Fuso: America/Recife (-03:00).\n\n2. DURAÇÃO\n- Duração padrão: 1 hora. Se o usuário informar outra, use a informada.\n\n3. INFORMAÇÕES FALTANTES\n- NUNCA invente horário, data ou título. Se faltar algo essencial (ex.: \"amanhã à tarde\" sem hora exata), pergunte antes de agir.\n- Se o pedido for ambíguo, pergunte.\n\n4. CRIAR EVENTO\n- Antes de criar, consulte o dia com 'Get many events in Google Calendar' (cobrindo do início ao fim do dia).\n- Reuniões no mesmo dia são permitidas, mas NÃO com sobreposição de horário. Em caso de conflito, informe qual evento existe e sugira o próximo horário livre.\n- Se estiver livre, crie com 'Create an event in Google Calendar'. 'Start' e 'End' em ISO 8601 com fuso (ex.: 2026-11-10T14:00:00-03:00).\n\n5. ALTERAR EVENTO\n- Consulte a agenda para achar o evento e obter o ID exato. Se houver mais de um candidato, liste e pergunte qual.\n- Verifique conflito no novo horário e então use 'Update an event in Google Calendar'.\n\n6. EXCLUIR EVENTO\n- Consulte a agenda para identificar o evento. Se houver mais de um candidato, pergunte qual.\n- Antes de excluir, peça confirmação ao usuário citando título, dia e horário. Só use 'Delete an event in Google Calendar' depois de um \"sim\" claro.\n\n7. CONSULTAR AGENDA\n- Para dia, semana ou mês, consulte o intervalo completo e resuma apenas o que a ferramenta retornou.\n\n8. REGRA DE OURO\n- Só diga que algo foi criado, alterado ou excluído se a ferramenta retornou sucesso. Se a ferramenta falhar ou não retornar o evento, diga claramente que NÃO foi possível concluir e nada foi alterado. Nunca simule operações.\n\n9. TOM\n- Respostas curtas e objetivas, prontas para WhatsApp. Ao confirmar, inclua título, data, início e fim."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        672,
+        80
+      ],
+      "id": "91fa9315-8f0e-496a-8735-6aceceabcb27",
+      "name": "AI Agent",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        352
+      ],
+      "id": "f5e41603-84cd-44b0-a7a7-a12630fe552d",
+      "name": "Google Gemini Chat Model"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Extrair mensagem').item.json.jid }}",
+        "contextWindowLength": 10
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        720,
+        352
+      ],
+      "id": "6ca62db0-142c-4679-bc2f-34b646974953",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "SEU_CALENDARIO_ID",
+          "mode": "id"
+        },
+        "timeMin": "={{ $fromAI('After', 'Início do intervalo em ISO 8601 com fuso, ex: 2026-11-10T00:00:00-03:00', 'string') }}",
+        "timeMax": "={{ $fromAI('Before', 'Fim do intervalo em ISO 8601 com fuso, ex: 2026-11-10T23:59:59-03:00', 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        880,
+        352
+      ],
+      "id": "dde98725-1566-49bd-a818-fb3b7b2938a4",
+      "name": "Get many events in Google Calendar"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "SEU_CALENDARIO_ID",
+          "mode": "id"
+        },
+        "start": "={{ $fromAI('Start', 'Início em ISO 8601 com fuso -03:00', 'string') }}",
+        "end": "={{ $fromAI('End', 'Término em ISO 8601 com fuso -03:00', 'string') }}",
+        "additionalFields": {
+          "description": "={{ $fromAI('Description', 'Descrição do evento (pode ser vazia)', 'string') }}",
+          "summary": "={{ $fromAI('Summary', 'Título do evento', 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        352
+      ],
+      "id": "f84dbf92-7523-4845-8b05-95f47654bffa",
+      "name": "Create an event in Google Calendar"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "SEU_CALENDARIO_ID",
+          "mode": "id"
+        },
+        "eventId": "={{ $fromAI('Event_ID', 'ID exato do evento obtido na consulta', 'string') }}",
+        "updateFields": {
+          "end": "={{ $fromAI('End', 'Novo término em ISO 8601 com fuso -03:00', 'string') }}",
+          "start": "={{ $fromAI('Start', 'Novo início em ISO 8601 com fuso -03:00', 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        352
+      ],
+      "id": "f081af70-a164-4fbd-93b1-bc627801d729",
+      "name": "Update an event in Google Calendar"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "SEU_CALENDARIO_ID",
+          "mode": "id"
+        },
+        "eventId": "={{ $fromAI('Event_ID', 'ID exato do evento obtido na consulta', 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1360,
+        352
+      ],
+      "id": "33811917-03c8-4f95-94d3-3d9fd178229f",
+      "name": "Delete an event in Google Calendar"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution_api:8080/message/sendText/Agent-Calendar",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $('Extrair mensagem').item.json.destino, text: '🤖 ' +  $json.output }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1024,
+        -64
+      ],
+      "id": "962d63e5-93e9-4658-86b7-6bc7c62fd889",
+      "name": "Enviar resposta",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://evolution_api:8080/message/sendText/Agent-Calendar",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ number: $('Extrair mensagem').item.json.destino, text: '🤖 Não consegui concluir a operação agora. Nada foi alterado na sua agenda. Tente novamente em instantes.' }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1024,
+        96
+      ],
+      "id": "f6bb9411-65d8-4e3c-8717-87e4f69a5fe3",
+      "name": "Enviar erro",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extrair mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair mensagem": {
+      "main": [
+        [
+          {
+            "node": "Filtro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Enviar resposta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an event in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete an event in Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

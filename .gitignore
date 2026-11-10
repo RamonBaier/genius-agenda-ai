@@ -1,0 +1,24 @@
+# Segredos
+.env
+secrets/
+credentials*.json
+token*.json
+*.key
+*.pem
+
+# n8n local
+.n8n/
+database.sqlite
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
